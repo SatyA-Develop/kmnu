@@ -30,6 +30,9 @@ while (have_posts()):
     $more_content = get_post_meta(get_the_ID(), 'more_details_content', true);
     $selected_doctors = get_post_meta(get_the_ID(), 'dept_doctors', true) ?: array();
 
+    // Featured image for hero right side
+    $featured_img_url = get_the_post_thumbnail_url(get_the_ID(), 'full');
+
     // Find a doctors page link
     $doctors_page = get_page_by_path('doctors');
     $find_doctor_url = $doctors_page ? get_permalink($doctors_page->ID) : home_url('/doctors/');
@@ -37,19 +40,53 @@ while (have_posts()):
 
     <!-- ===== SPECIALITY HERO SECTION ===== -->
     <?php
+    $hero_bg_img = home_url('/wp-content/uploads/2026/04/KMNU_Home-Assets-01-scaled.webp');
+    $hero_inline_style = 'background-color:' . esc_attr($hero_bg_color) . ';'
+        . 'background-image:url(' . esc_url($hero_bg_img) . ');'
+        . 'background-size:cover;background-position:center bottom;background-repeat:no-repeat;';
     $banner_title = get_post_meta(get_the_ID(), 'banner_title', true);
-    $banner_subtitle = $hero_subtitle;
-    if (!$banner_subtitle && has_excerpt()) {
-        $banner_subtitle = get_the_excerpt();
-    }
-
-    kmnu_page_banner(array(
-        'class' => 'dept-standard-hero',
-        'title' => !empty($banner_title) ? $banner_title : get_the_title(),
-        'subtitle' => $banner_subtitle,
-        'wave_fill' => '#f4f7fa',
-    ));
     ?>
+    <section class="dept-hero-section" style="<?php echo $hero_inline_style; ?>">
+        <div class="container dept-hero-container">
+            <div class="dept-hero-content">
+                <?php if ($dept_icon): ?>
+                    <div class="dept-hero-icon">
+                        <i class="fa-solid <?php echo esc_attr($dept_icon); ?>"></i>
+                    </div>
+                <?php endif; ?>
+
+                <h1 class="dept-hero-title">
+                    <?php echo esc_html(!empty($banner_title) ? $banner_title : get_the_title()); ?>
+                </h1>
+
+                <?php if ($hero_subtitle): ?>
+                    <p class="dept-hero-subtitle"><?php echo esc_html($hero_subtitle); ?></p>
+                <?php elseif (has_excerpt()): ?>
+                    <p class="dept-hero-subtitle"><?php echo esc_html(get_the_excerpt()); ?></p>
+                <?php endif; ?>
+
+                <a href="<?php echo esc_url($find_doctor_url); ?>" class="dept-hero-btn">
+                    FIND A DOCTOR
+                </a>
+            </div>
+
+            <div class="dept-hero-image">
+                <?php if ($featured_img_url): ?>
+                    <img src="<?php echo esc_url($featured_img_url); ?>" alt="<?php the_title_attribute(); ?>" class="dept-hero-img">
+                <?php elseif ($dept_icon): ?>
+                    <div class="dept-hero-icon-fallback">
+                        <i class="fa-solid <?php echo esc_attr($dept_icon); ?>"></i>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="dept-hero-wave">
+            <svg viewBox="0 0 1440 80" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill="#f4f7fa" />
+            </svg>
+        </div>
+    </section>
 
     <!-- ===== MAIN CONTENT ===== -->
     <div class="dept-inner-wrap">
