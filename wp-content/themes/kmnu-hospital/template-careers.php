@@ -362,6 +362,7 @@ get_header();
                 <form class="careers-form" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="action" value="submit_kmnu_career">
                     <?php wp_nonce_field('kmnu_career_nonce', 'kmnu_nonce_field'); ?>
+                    <?php kmnu_render_spam_protection_fields('career'); ?>
                     
                     <div class="form-grid">
                         <div class="form-group full-width">

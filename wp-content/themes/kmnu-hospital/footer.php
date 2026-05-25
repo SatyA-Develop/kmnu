@@ -11,6 +11,7 @@
         <form class="subscription-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
             <input type="hidden" name="action" value="submit_kmnu_subscription">
             <?php wp_nonce_field('kmnu_subscription_nonce', 'kmnu_subscription_nonce_field'); ?>
+            <?php kmnu_render_spam_protection_fields('subscription'); ?>
             <div class="input-wrap">
                 <i class="fa-solid fa-envelope"></i>
                 <input type="email" name="subscriber_email" placeholder="Enter your email address" required>
@@ -185,6 +186,23 @@ $mob_menu_data = kmnu_get_mob_res_menu_data();
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('form').forEach(function (form) {
+            var ts = form.querySelector('input[name="kmnu_form_ts"]');
+            var key = form.querySelector('input[name="kmnu_form_key"]');
+            var token = form.querySelector('input[name="kmnu_js_token"]');
+            if (ts && key && token) {
+                token.value = 'kmnu-js-' + key.value + '-' + ts.value;
+            }
+
+            form.addEventListener('submit', function () {
+                var submitter = form.querySelector('button[type="submit"], input[type="submit"]');
+                if (submitter) {
+                    submitter.disabled = true;
+                    submitter.classList.add('is-submitting');
+                }
+            });
+        });
+
         var hamburger = document.querySelector('.mob-res-hamburger');
         var closeBtn = document.getElementById('mobResClose');
         var overlay = document.getElementById('mobResOverlay');

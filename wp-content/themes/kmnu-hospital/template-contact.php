@@ -287,6 +287,7 @@ textarea.form-control {
                     <form action="<?php echo esc_url(admin_url('admin-post.php')); ?>" method="POST" class="kmnu-contact-form">
                         <input type="hidden" name="action" value="submit_kmnu_contact">
                         <?php wp_nonce_field('kmnu_contact_nonce', 'kmnu_nonce_field'); ?>
+                        <?php kmnu_render_spam_protection_fields('contact'); ?>
                         
                         <div class="form-row">
                             <div class="form-group">

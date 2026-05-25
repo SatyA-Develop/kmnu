@@ -159,6 +159,7 @@ textarea.appointment-control {
                 <form action="<?php echo esc_url(admin_url('admin-post.php')); ?>" method="POST" class="kmnu-appointment-form">
                     <input type="hidden" name="action" value="submit_kmnu_appointment">
                     <?php wp_nonce_field('kmnu_appointment_nonce', 'kmnu_appointment_nonce_field'); ?>
+                    <?php kmnu_render_spam_protection_fields('appointment'); ?>
 
                     <div class="appointment-row">
                         <div class="appointment-field">

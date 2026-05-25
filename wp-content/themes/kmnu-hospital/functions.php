@@ -1867,6 +1867,143 @@ function kmnu_get_form_receiver_emails() {
     return !empty($recipients) ? array_values($recipients) : $default_recipients;
 }
 
+function kmnu_render_spam_protection_fields($form_key) {
+    $timestamp = time();
+    ?>
+    <div class="kmnu-form-shield" aria-hidden="true" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;">
+        <label>Company Website <input type="text" name="kmnu_company_url" tabindex="-1" autocomplete="off"></label>
+    </div>
+    <input type="hidden" name="kmnu_form_key" value="<?php echo esc_attr($form_key); ?>">
+    <input type="hidden" name="kmnu_form_ts" value="<?php echo esc_attr($timestamp); ?>">
+    <input type="hidden" name="kmnu_js_token" value="">
+    <?php
+}
+
+function kmnu_log_suspicious_submission($form_key, $reason) {
+    $upload_dir = wp_upload_dir();
+    if (empty($upload_dir['basedir'])) {
+        return;
+    }
+
+    $log_dir = trailingslashit($upload_dir['basedir']) . 'kmnu-security';
+    if (!wp_mkdir_p($log_dir)) {
+        return;
+    }
+
+    $entry = sprintf(
+        "[%s] form=%s reason=%s ip=%s ua=%s\n",
+        gmdate('c'),
+        sanitize_key($form_key),
+        sanitize_text_field($reason),
+        isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : '',
+        isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) : ''
+    );
+    error_log($entry, 3, trailingslashit($log_dir) . 'spam.log');
+}
+
+function kmnu_form_fail($form_key, $reason, $anchor = '') {
+    kmnu_log_suspicious_submission($form_key, $reason);
+    $referer = wp_get_referer() ? wp_get_referer() : home_url('/');
+    $target = $form_key === 'subscription'
+        ? add_query_arg('subscription', 'error', $referer)
+        : add_query_arg('status', 'error', $referer);
+    if ($anchor) {
+        $target .= '#' . ltrim($anchor, '#');
+    }
+    wp_safe_redirect($target);
+    exit;
+}
+
+function kmnu_contains_blocked_language($value) {
+    return (bool) preg_match('/[\x{0400}-\x{04FF}\x{3400}-\x{9FFF}\x{F900}-\x{FAFF}]/u', (string) $value);
+}
+
+function kmnu_contains_link($value) {
+    return (bool) preg_match('/(?:https?:\/\/|www\.|[a-z0-9-]+\.(?:ru|cn|com|net|org|info|biz|xyz|top|site|online|click|link)\b)/i', (string) $value);
+}
+
+function kmnu_is_blocked_email_domain($email) {
+    $domain = strtolower(substr(strrchr((string) $email, '@'), 1));
+    if (!$domain) {
+        return true;
+    }
+
+    $blocked_domains = array(
+        'gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.co.in', 'outlook.com', 'hotmail.com', 'live.com',
+        'icloud.com', 'aol.com', 'proton.me', 'protonmail.com', 'rediffmail.com',
+        'mailinator.com', 'tempmail.com', '10minutemail.com', 'guerrillamail.com', 'yopmail.com',
+        'trashmail.com', 'getnada.com', 'dispostable.com', 'fakeinbox.com', 'sharklasers.com'
+    );
+
+    return in_array($domain, apply_filters('kmnu_blocked_email_domains', $blocked_domains), true);
+}
+
+function kmnu_validate_phone_number($phone) {
+    return (bool) preg_match('/^[0-9+\s().-]{7,20}$/', (string) $phone);
+}
+
+function kmnu_validate_human_text($value, $max_length = 120, $allow_punctuation = true) {
+    $value = trim((string) $value);
+    if ($value === '' || mb_strlen($value) > $max_length || kmnu_contains_blocked_language($value) || kmnu_contains_link($value)) {
+        return false;
+    }
+
+    $pattern = $allow_punctuation ? '/^[\p{L}\p{N}\s.,&()\/+-]+$/u' : '/^[\p{L}\s.-]+$/u';
+    return (bool) preg_match($pattern, $value);
+}
+
+function kmnu_validate_message_text($value, $max_length = 1000) {
+    $value = trim((string) $value);
+    if ($value === '') {
+        return true;
+    }
+
+    return mb_strlen($value) <= $max_length && !kmnu_contains_blocked_language($value) && !kmnu_contains_link($value);
+}
+
+function kmnu_check_rate_limit($form_key) {
+    $ip = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : 'unknown';
+    $base_key = 'kmnu_form_rate_' . md5($form_key . '|' . $ip);
+    $cooldown_key = $base_key . '_cooldown';
+
+    if (get_transient($cooldown_key)) {
+        return false;
+    }
+
+    $count = (int) get_transient($base_key);
+    if ($count >= 5) {
+        return false;
+    }
+
+    set_transient($base_key, $count + 1, 15 * MINUTE_IN_SECONDS);
+    set_transient($cooldown_key, 1, 20);
+    return true;
+}
+
+function kmnu_validate_spam_protection($form_key, $anchor = '') {
+    $posted_form_key = isset($_POST['kmnu_form_key']) ? sanitize_key(wp_unslash($_POST['kmnu_form_key'])) : '';
+    $honeypot = isset($_POST['kmnu_company_url']) ? trim((string) wp_unslash($_POST['kmnu_company_url'])) : '';
+    $timestamp = isset($_POST['kmnu_form_ts']) ? absint($_POST['kmnu_form_ts']) : 0;
+    $js_token = isset($_POST['kmnu_js_token']) ? sanitize_text_field(wp_unslash($_POST['kmnu_js_token'])) : '';
+    $age = time() - $timestamp;
+
+    if ($posted_form_key !== $form_key) {
+        kmnu_form_fail($form_key, 'form_key', $anchor);
+    }
+    if ($honeypot !== '') {
+        kmnu_form_fail($form_key, 'honeypot', $anchor);
+    }
+    if ($timestamp <= 0 || $age < 4 || $age > DAY_IN_SECONDS) {
+        kmnu_form_fail($form_key, 'timestamp', $anchor);
+    }
+    if ($js_token !== 'kmnu-js-' . $form_key . '-' . $timestamp) {
+        kmnu_form_fail($form_key, 'js_token', $anchor);
+    }
+    if (!kmnu_check_rate_limit($form_key)) {
+        kmnu_form_fail($form_key, 'rate_limit', $anchor);
+    }
+}
+
 function kmnu_redirect_to_thank_you($form_type, $name, $details = array()) {
     $token = wp_generate_uuid4();
     $payload = array(
@@ -1884,17 +2021,28 @@ function kmnu_redirect_to_thank_you($form_type, $name, $details = array()) {
  * Contact Form Handler
  */
 function kmnu_handle_contact_submission() {
-    if (!isset($_POST['kmnu_nonce_field']) || !wp_verify_nonce($_POST['kmnu_nonce_field'], 'kmnu_contact_nonce')) {
-        wp_redirect(add_query_arg('status', 'error', wp_get_referer() . '#appointment'));
-        exit;
+    if (!isset($_POST['kmnu_nonce_field']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['kmnu_nonce_field'])), 'kmnu_contact_nonce')) {
+        kmnu_form_fail('contact', 'nonce', 'appointment');
     }
+    kmnu_validate_spam_protection('contact', 'appointment');
 
-    $first_name = sanitize_text_field($_POST['first_name']);
-    $last_name = sanitize_text_field($_POST['last_name']);
-    $phone = sanitize_text_field($_POST['phone']);
-    $email = sanitize_email($_POST['email']);
-    $speciality = sanitize_text_field($_POST['speciality']);
-    $message = sanitize_textarea_field($_POST['message']);
+    $first_name = isset($_POST['first_name']) ? sanitize_text_field(wp_unslash($_POST['first_name'])) : '';
+    $last_name = isset($_POST['last_name']) ? sanitize_text_field(wp_unslash($_POST['last_name'])) : '';
+    $phone = isset($_POST['phone']) ? sanitize_text_field(wp_unslash($_POST['phone'])) : '';
+    $email = isset($_POST['email']) ? sanitize_email(wp_unslash($_POST['email'])) : '';
+    $speciality = isset($_POST['speciality']) ? sanitize_text_field(wp_unslash($_POST['speciality'])) : '';
+    $message = isset($_POST['message']) ? sanitize_textarea_field(wp_unslash($_POST['message'])) : '';
+
+    if (
+        !kmnu_validate_human_text($first_name, 60, false) ||
+        ($last_name && !kmnu_validate_human_text($last_name, 60, false)) ||
+        !kmnu_validate_phone_number($phone) ||
+        ($email && (!is_email($email) || kmnu_is_blocked_email_domain($email))) ||
+        !kmnu_validate_human_text($speciality, 120, true) ||
+        !kmnu_validate_message_text($message)
+    ) {
+        kmnu_form_fail('contact', 'validation', 'appointment');
+    }
 
     $to = kmnu_get_form_receiver_emails();
     $subject = 'New Contact Request from ' . $first_name . ' ' . $last_name;
@@ -1931,10 +2079,10 @@ add_action('admin_post_submit_kmnu_contact', 'kmnu_handle_contact_submission');
  * Book Appointment Form Handler
  */
 function kmnu_handle_appointment_submission() {
-    if (!isset($_POST['kmnu_appointment_nonce_field']) || !wp_verify_nonce($_POST['kmnu_appointment_nonce_field'], 'kmnu_appointment_nonce')) {
-        wp_redirect(add_query_arg('status', 'error', wp_get_referer() . '#appointment'));
-        exit;
+    if (!isset($_POST['kmnu_appointment_nonce_field']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['kmnu_appointment_nonce_field'])), 'kmnu_appointment_nonce')) {
+        kmnu_form_fail('appointment', 'nonce', 'appointment');
     }
+    kmnu_validate_spam_protection('appointment', 'appointment');
 
     $patient_name = isset($_POST['patient_name']) ? sanitize_text_field(wp_unslash($_POST['patient_name'])) : '';
     $patient_email = isset($_POST['patient_email']) ? sanitize_email(wp_unslash($_POST['patient_email'])) : '';
@@ -1947,9 +2095,17 @@ function kmnu_handle_appointment_submission() {
     $doctor = $doctor_id ? get_post($doctor_id) : null;
     $doctor_name = ($doctor && $doctor->post_type === 'doctors') ? $doctor->post_title : '';
 
-    if (!$patient_name || !$patient_email || !$patient_phone || !$doctor_name || !$appointment_date) {
-        wp_redirect(add_query_arg('status', 'error', wp_get_referer() . '#appointment'));
-        exit;
+    if (
+        !kmnu_validate_human_text($patient_name, 90, false) ||
+        !$patient_email || !is_email($patient_email) || kmnu_is_blocked_email_domain($patient_email) ||
+        !kmnu_validate_phone_number($patient_phone) ||
+        !$doctor_name ||
+        !preg_match('/^\d{4}-\d{2}-\d{2}$/', $appointment_date) ||
+        strtotime($appointment_date) < strtotime(current_time('Y-m-d')) ||
+        ($package && !kmnu_validate_human_text($package, 140, true)) ||
+        !kmnu_validate_message_text($message)
+    ) {
+        kmnu_form_fail('appointment', 'validation', 'appointment');
     }
 
     $headers = array('Content-Type: text/html; charset=UTF-8');
@@ -2012,15 +2168,14 @@ function kmnu_handle_subscription_submission() {
         !isset($_POST['kmnu_subscription_nonce_field']) ||
         !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['kmnu_subscription_nonce_field'])), 'kmnu_subscription_nonce')
     ) {
-        wp_safe_redirect(add_query_arg('subscription', 'error', $fallback_url));
-        exit;
+        kmnu_form_fail('subscription', 'nonce');
     }
+    kmnu_validate_spam_protection('subscription');
 
     $subscriber_email = isset($_POST['subscriber_email']) ? sanitize_email(wp_unslash($_POST['subscriber_email'])) : '';
 
-    if (!$subscriber_email || !is_email($subscriber_email)) {
-        wp_safe_redirect(add_query_arg('subscription', 'error', $fallback_url));
-        exit;
+    if (!$subscriber_email || !is_email($subscriber_email) || kmnu_is_blocked_email_domain($subscriber_email)) {
+        kmnu_form_fail('subscription', 'validation');
     }
 
     $subscriber_name = ucwords(str_replace(array('.', '_', '-'), ' ', strstr($subscriber_email, '@', true)));
@@ -2057,18 +2212,30 @@ add_action('admin_post_submit_kmnu_subscription', 'kmnu_handle_subscription_subm
  * Careers Form Handler (With File Attachment)
  */
 function kmnu_handle_career_submission() {
-    if (!isset($_POST['kmnu_nonce_field']) || !wp_verify_nonce($_POST['kmnu_nonce_field'], 'kmnu_career_nonce')) {
-        wp_redirect(add_query_arg('status', 'error', wp_get_referer() . '#careers-form'));
-        exit;
+    if (!isset($_POST['kmnu_nonce_field']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['kmnu_nonce_field'])), 'kmnu_career_nonce')) {
+        kmnu_form_fail('career', 'nonce', 'careers-form');
     }
+    kmnu_validate_spam_protection('career', 'careers-form');
 
-    $full_name = sanitize_text_field($_POST['fullName']);
-    $email = sanitize_email($_POST['email']);
-    $phone = sanitize_text_field($_POST['phone']);
-    $gender = sanitize_text_field($_POST['gender']);
-    $experience = sanitize_text_field($_POST['experience']);
-    $city = sanitize_text_field($_POST['city']);
-    $message = sanitize_textarea_field($_POST['message']);
+    $full_name = isset($_POST['fullName']) ? sanitize_text_field(wp_unslash($_POST['fullName'])) : '';
+    $email = isset($_POST['email']) ? sanitize_email(wp_unslash($_POST['email'])) : '';
+    $phone = isset($_POST['phone']) ? sanitize_text_field(wp_unslash($_POST['phone'])) : '';
+    $gender = isset($_POST['gender']) ? sanitize_text_field(wp_unslash($_POST['gender'])) : '';
+    $experience = isset($_POST['experience']) ? sanitize_text_field(wp_unslash($_POST['experience'])) : '';
+    $city = isset($_POST['city']) ? sanitize_text_field(wp_unslash($_POST['city'])) : '';
+    $message = isset($_POST['message']) ? sanitize_textarea_field(wp_unslash($_POST['message'])) : '';
+
+    if (
+        !kmnu_validate_human_text($full_name, 90, false) ||
+        !$email || !is_email($email) || kmnu_is_blocked_email_domain($email) ||
+        !kmnu_validate_phone_number($phone) ||
+        !in_array($gender, array('Male', 'Female', 'Other'), true) ||
+        !preg_match('/^\d{1,2}$/', $experience) ||
+        !kmnu_validate_human_text($city, 80, false) ||
+        !kmnu_validate_message_text($message, 1200)
+    ) {
+        kmnu_form_fail('career', 'validation', 'careers-form');
+    }
 
     $to = kmnu_get_form_receiver_emails();
     $subject = 'New Career Application from ' . $full_name;
@@ -2092,10 +2259,21 @@ function kmnu_handle_career_submission() {
     // Handle File Upload
     if (isset($_FILES['resumeFile']) && $_FILES['resumeFile']['error'] == UPLOAD_ERR_OK) {
         $uploaded_file = $_FILES['resumeFile'];
+        $allowed_mimes = array(
+            'pdf' => 'application/pdf',
+            'doc' => 'application/msword',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        );
+        $file_check = wp_check_filetype_and_ext($uploaded_file['tmp_name'], $uploaded_file['name'], $allowed_mimes);
+        if ((int) $uploaded_file['size'] > 2 * MB_IN_BYTES || empty($file_check['ext']) || empty($file_check['type'])) {
+            kmnu_form_fail('career', 'file_validation', 'careers-form');
+        }
         $movefile = wp_handle_upload($uploaded_file, array('test_form' => false));
         if ($movefile && !isset($movefile['error'])) {
             $attachments[] = $movefile['file'];
         }
+    } else {
+        kmnu_form_fail('career', 'file_missing', 'careers-form');
     }
 
     $sent = wp_mail($to, $subject, $body, $headers, $attachments);
