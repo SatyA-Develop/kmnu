@@ -208,7 +208,39 @@ get_header();
 }
 
 @media (max-width: 768px) {
-    .locations-grid { grid-template-columns: 1fr; }
+    .locations-page,
+    .locations-grid-section {
+        overflow-x: hidden;
+    }
+    .locations-page .container {
+        width: 100%;
+        max-width: 100%;
+        padding-left: 18px;
+        padding-right: 18px;
+        box-sizing: border-box;
+    }
+    .locations-grid {
+        grid-template-columns: 1fr;
+        width: 100%;
+        max-width: 100%;
+        justify-items: center;
+    }
+    .hospital-card {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    .hosp-info {
+        padding: 24px 22px;
+    }
+    .hosp-info h3 {
+        font-size: 24px;
+        line-height: 1.25;
+    }
+    .hosp-rating {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
 }
 </style>
 

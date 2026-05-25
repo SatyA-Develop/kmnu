@@ -59,8 +59,8 @@
         @media (max-width: 768px) {
             .lang-toggle-fixed {
                 top: auto;
-                bottom: 16px;
-                right: 80px;
+                bottom: 18px;
+                right: 86px;
                 transform: none;
                 padding: 5px;
                 border-radius: 12px;

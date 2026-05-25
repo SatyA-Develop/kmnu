@@ -279,7 +279,67 @@ $price = get_post_meta(get_the_ID(), 'price', true);
     .checkup-sidebar { position: static; }
 }
 @media (max-width: 768px) {
+    .single-checkup-page,
+    .single-checkup-content {
+        overflow-x: hidden;
+    }
+    .single-checkup-page .container {
+        width: 100%;
+        max-width: 100%;
+        padding-left: 18px;
+        padding-right: 18px;
+        box-sizing: border-box;
+    }
     .single-checkup-hero h1 { font-size: 36px; }
+    .single-checkup-content {
+        padding-top: 42px;
+        padding-bottom: 74px;
+    }
+    .checkup-content-grid,
+    .checkup-main-col,
+    .checkup-sidebar,
+    .checkup-main-image,
+    .checkup-details-box,
+    .booking-card {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+    .checkup-details-box,
+    .booking-card {
+        padding: 28px 22px;
+        border-radius: 18px;
+    }
+    .checkup-details-box h2,
+    .booking-card h3 {
+        font-size: 24px;
+        line-height: 1.35;
+    }
+    .checkup-details-list ul {
+        column-count: 1 !important;
+        column-gap: 0 !important;
+        padding-left: 20px !important;
+    }
+    .btn-book-action {
+        width: 100%;
+        box-sizing: border-box;
+        padding-left: 18px;
+        padding-right: 18px;
+    }
+    .features-list li {
+        align-items: flex-start;
+        line-height: 1.5;
+    }
+    .package-navigation {
+        flex-direction: column;
+        gap: 14px;
+    }
+    .nav-link-wrap,
+    .nav-link-wrap a {
+        width: 100%;
+        box-sizing: border-box;
+    }
 }
 </style>
 
