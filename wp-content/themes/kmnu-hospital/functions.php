@@ -1851,6 +1851,22 @@ function kmnu_get_doctor_suggestions() {
 add_action('wp_ajax_get_doctor_suggestions', 'kmnu_get_doctor_suggestions');
 add_action('wp_ajax_nopriv_get_doctor_suggestions', 'kmnu_get_doctor_suggestions');
 
+function kmnu_get_form_receiver_emails() {
+    $default_recipients = array('care.ambur@nuhospitals.com', 'siddu2214@gmail.com');
+
+    if (!defined('KMNU_FORM_RECEIVER_EMAIL')) {
+        return $default_recipients;
+    }
+
+    $recipients = KMNU_FORM_RECEIVER_EMAIL;
+    if (is_string($recipients)) {
+        $recipients = array_map('trim', explode(',', $recipients));
+    }
+
+    $recipients = array_filter((array) $recipients, 'is_email');
+    return !empty($recipients) ? array_values($recipients) : $default_recipients;
+}
+
 function kmnu_redirect_to_thank_you($form_type, $name, $details = array()) {
     $token = wp_generate_uuid4();
     $payload = array(
@@ -1880,7 +1896,7 @@ function kmnu_handle_contact_submission() {
     $speciality = sanitize_text_field($_POST['speciality']);
     $message = sanitize_textarea_field($_POST['message']);
 
-    $to = defined('KMNU_FORM_RECEIVER_EMAIL') ? KMNU_FORM_RECEIVER_EMAIL : 'dashsatyabrata1999@gmail.com';
+    $to = kmnu_get_form_receiver_emails();
     $subject = 'New Contact Request from ' . $first_name . ' ' . $last_name;
     
     $body = "<h2>New Contact Request from KMNU Website</h2>";
@@ -1937,7 +1953,7 @@ function kmnu_handle_appointment_submission() {
     }
 
     $headers = array('Content-Type: text/html; charset=UTF-8');
-    $admin_email = defined('KMNU_FORM_RECEIVER_EMAIL') ? KMNU_FORM_RECEIVER_EMAIL : 'dashsatyabrata1999@gmail.com';
+    $admin_email = kmnu_get_form_receiver_emails();
     $admin_subject = 'New Appointment Request - ' . $patient_name;
 
     $admin_body = '<h2>New Appointment Request</h2>';
@@ -2012,7 +2028,7 @@ function kmnu_handle_subscription_submission() {
         $subscriber_name = 'Subscriber';
     }
 
-    $to = defined('KMNU_FORM_RECEIVER_EMAIL') ? KMNU_FORM_RECEIVER_EMAIL : 'dashsatyabrata1999@gmail.com';
+    $to = kmnu_get_form_receiver_emails();
     $subject = 'New KMNU Newsletter Subscription';
     $body = '<h2>New Newsletter Subscription</h2>';
     $body .= '<p><strong>Email:</strong> ' . esc_html($subscriber_email) . '</p>';
@@ -2054,7 +2070,7 @@ function kmnu_handle_career_submission() {
     $city = sanitize_text_field($_POST['city']);
     $message = sanitize_textarea_field($_POST['message']);
 
-    $to = defined('KMNU_FORM_RECEIVER_EMAIL') ? KMNU_FORM_RECEIVER_EMAIL : 'dashsatyabrata1999@gmail.com';
+    $to = kmnu_get_form_receiver_emails();
     $subject = 'New Career Application from ' . $full_name;
     
     $body = "<h2>New Career Application from KMNU Website</h2>";
