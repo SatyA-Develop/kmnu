@@ -1,0 +1,20 @@
+# Local WordPress configuration and generated content
+wp-config.php
+wp-content/uploads/
+wp-content/upgrade/
+wp-content/cache/
+wp-content/backup*/
+wp-content/updraft/
+
+# Local scratch/import/export files
+scratch/
+*.sql
+*.sql.gz
+*.zip
+*.log
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
