@@ -2369,6 +2369,20 @@ function kmnu_get_clean_excerpt($content = '', $limit = 25) {
     return wp_trim_words($content, $limit, '...');
 }
 
+function kmnu_trim_card_text($text, $max_chars = 120) {
+    $text = html_entity_decode(wp_strip_all_tags((string) $text));
+    $text = preg_replace('/\s+/', ' ', $text);
+    $text = trim($text);
+
+    if (mb_strlen($text) <= $max_chars) {
+        return $text;
+    }
+
+    $trimmed = mb_substr($text, 0, $max_chars);
+    $trimmed = preg_replace('/\s+\S*$/u', '', $trimmed);
+    return rtrim($trimmed, " \t\n\r\0\x0B.,;:-") . '...';
+}
+
 
 /**
  * AJAX Handler for Blog Post Suggestions

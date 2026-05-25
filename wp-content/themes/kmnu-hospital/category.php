@@ -186,11 +186,16 @@ get_header();
     font-weight: 800;
     line-height: 1.4;
     transition: 0.3s;
+    min-height: 92px;
 }
 
 .blog-info h3 a {
     color: inherit;
     text-decoration: none;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .blog-info h3 a:hover {
@@ -203,6 +208,11 @@ get_header();
     line-height: 1.7;
     margin-bottom: 25px;
     flex: 1;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 102px;
 }
 
 .blog-footer {
@@ -330,14 +340,14 @@ get_header();
                                     <span><i class="fa-regular fa-calendar"></i> <?php echo get_the_date(); ?></span>
                                     <span><i class="fa-regular fa-user"></i> <?php the_author(); ?></span>
                                 </div>
-                                <h3><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h3>
+                                <h3><a href="<?php the_permalink(); ?>"><?php echo esc_html(kmnu_trim_card_text(get_the_title(), 72)); ?></a></h3>
                                 <div class="desc">
                                     <?php 
                                     $short_desc = get_post_meta(get_the_ID(), 'short_desc', true);
                                     if ($short_desc) {
-                                        echo wp_trim_words($short_desc, 25, '...');
+                                        echo esc_html(kmnu_trim_card_text($short_desc, 145));
                                     } else {
-                                        echo wp_trim_words(get_the_excerpt(), 25, '...');
+                                        echo esc_html(kmnu_trim_card_text(get_the_excerpt(), 145));
                                     }
                                     ?>
                                 </div>
